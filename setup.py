@@ -14,6 +14,9 @@ setup(
         "tqdm",
         "pin",
         "transforms3d",
-        "trimesh",  
+        "trimesh",
+        "foxglove-sdk",
+        "foxglove-data-platform",
+        "flask",
     ],
 )

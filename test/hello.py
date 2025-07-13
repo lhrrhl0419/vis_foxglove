@@ -6,14 +6,14 @@ import foxglove
 from foxglove import Channel
 from foxglove.channels import SceneUpdateChannel
 from foxglove.schemas import (
-  Color,
-  CubePrimitive,
-  SceneEntity,
-  SceneUpdate,
-  Vector3,
-  Quaternion,
-  ModelPrimitive,
-  Pose,
+    Color,
+    CubePrimitive,
+    SceneEntity,
+    SceneUpdate,
+    Vector3,
+    Quaternion,
+    ModelPrimitive,
+    Pose,
 )
 
 foxglove.set_log_level("DEBUG")
@@ -33,14 +33,14 @@ server = foxglove.start_server()
 
 # while True:
 if True:
-    for _ in range(10*30):
+    for _ in range(10 * 30):
         size = abs(math.sin(time.time())) + 1
 
         # Log messages on both channels until interrupted. By default, each message
         # is stamped with the current time.
         # size_channel.log({"size": size})
         # with open("assets/power_dril.obj", "rb") as f:
-            # power_drill_asset = f.read()
+        # power_drill_asset = f.read()
 
         scene_channel.log(
             SceneUpdate(
@@ -54,10 +54,13 @@ if True:
                         # ],
                         models=[
                             ModelPrimitive(
-                                pose=Pose(position=Vector3(x=0, y=0, z=0), orientation=Quaternion(x=0, y=0, z=0, w=1)),
+                                pose=Pose(
+                                    position=Vector3(x=0, y=0, z=0),
+                                    orientation=Quaternion(x=0, y=0, z=0, w=1),
+                                ),
                                 scale=Vector3(x=size, y=size, z=size),
                                 # media_type="model/obj",
-                                url='http://localhost:12345/mnt/afs/liuhaoran/code/reason_vla/storage/asset/robot/galbot_description/galbot_one_charlie_description/meshes/chassis/omni_chassis_base_link.obj'
+                                url="http://localhost:12345/mnt/afs/liuhaoran/code/reason_vla/storage/asset/robot/galbot_description/galbot_one_charlie_description/meshes/chassis/omni_chassis_base_link.obj",
                             )
                         ]
                     ),

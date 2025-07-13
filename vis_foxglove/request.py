@@ -1,10 +1,10 @@
+import os
 import socket
 import socketserver
 
-from vis_foxglove.ports import REQUEST_PORT
 from vis_foxglove.download import download_with_rsync
 
-def request_sync(local_machine_ip="127.0.0.1", port=REQUEST_PORT) -> bool:
+def request_sync(local_machine_ip="127.0.0.1", port=int(os.getenv("REQUEST_TRANSFER_PORT"))) -> bool:
     """Send a sync request to the local machine"""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -28,18 +28,18 @@ class SyncRequestHandler(socketserver.BaseRequestHandler):
         if data == "SYNC_REQUEST":
             print("Received sync request from server")
             try:
-                download_with_rsync()
+                download_with_rsync(local_dir=os.getenv("LOCAL_PATH"))
                 self.request.sendall(b"SYNC_COMPLETE")
             except Exception as e:
                 print(f"Sync failed: {e}")
                 self.request.sendall(b"SYNC_FAILED")
 
 
-def start_listener(port=REQUEST_PORT):
+def start_listener(port=int(os.getenv("REQUEST_TRANSFER_PORT"))):
     with socketserver.TCPServer(("0.0.0.0", port), SyncRequestHandler) as server:
         print(f"Local sync listener running on port {port}")
         server.serve_forever()
 
 
 if __name__ == "__main__":
-    request_sync()
+    start_listener()
