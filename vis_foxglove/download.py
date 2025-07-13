@@ -11,7 +11,6 @@ def download_with_rsync(
     remote_dir=None,
     local_dir=None,
 ):
-    os.makedirs(local_dir, exist_ok=True)
     host = os.environ.get("IP") if host is None else host
     port = os.environ.get("PORT") if port is None else port
     username = os.environ.get("REMOTE_USER") if username is None else username
@@ -20,6 +19,7 @@ def download_with_rsync(
     )
     remote_dir = os.environ.get("REMOTE_PATH") if remote_dir is None else remote_dir
     local_dir = os.environ.get("LOCAL_PATH") if local_dir is None else local_dir
+    os.makedirs(local_dir, exist_ok=True)
 
     # Construct the rsync command
     cmd = [
