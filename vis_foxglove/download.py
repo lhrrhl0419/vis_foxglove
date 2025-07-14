@@ -1,6 +1,7 @@
 import os
 import subprocess
 from tqdm import tqdm
+from time import sleep
 
 
 def download_with_rsync(
@@ -42,4 +43,6 @@ def download_with_rsync(
 
 # Example Usage
 if __name__ == "__main__":
-    download_with_rsync()
+    while True:
+        download_with_rsync()
+        sleep(0.5)

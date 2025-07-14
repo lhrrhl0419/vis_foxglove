@@ -17,7 +17,7 @@ IP=<IP address> PORT=<port number> REMOTE_USER=<remote server's username> KEY=<p
 
 The visualization of various elements in vis_save returns a list. These lists can be combined to create complex scenes, and the final saved result is a list of lists, each representing a moment in time. Currently, saving will result in a folder containing scene.json and a bunch of meshes, with the same mesh being saved only once.
 
-vis_save can run on a remote server. After saving the folder, you can run vis_pyvista locally. By setting the remote server's path through environment variables (see src/utils/download.py), the content from the remote server will be automatically downloaded. You can then freely adjust the view with the mouse and use the progress bar in the upper right corner to switch between time steps. 
+vis_save can run on a remote server. After saving the folder, you can run vis_pyvista locally. By setting the remote server's path through environment variables (see src/utilsdownload.py), the content from the remote server will be automatically downloaded. You can then freely adjust the view with the mouse and use the progress bar in the upper right corner to switch between time steps. 
 
 Additionally, there are some keyboard shortcuts, including:
 
@@ -31,3 +31,13 @@ Additionally, there are some keyboard shortcuts, including:
 - q: clear the number buffer
 
 The (number) represents the scene number that can be input before the corresponding command. This number can specify the download/read/save location. If no number is set, the current scene number is used (initialized to 0).
+
+
+
+
+port
+`ssh -fN -R 18481:localhost:18481 liuhaoran@106.75.235.206 -p 65535`
+file server
+`python -m vis_foxglove.file_server`
+download
+`python -m vis_foxglove.download`
