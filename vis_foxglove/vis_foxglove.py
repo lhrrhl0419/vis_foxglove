@@ -1,6 +1,7 @@
 import os
 from typing import Optional, List, Dict, Union
 import numpy as np
+import curses
 
 try:
     import torch
@@ -9,9 +10,16 @@ except ImportError:
 from time import sleep
 from transforms3d.quaternions import mat2quat
 import matplotlib.colors as mcolors
+import subprocess
+
 import foxglove
 from foxglove import Context
-from foxglove.channels import SceneUpdateChannel
+from foxglove.channels import (
+    SceneUpdateChannel,
+    RawImageChannel,
+    LogChannel,
+    CompressedVideoChannel,
+)
 from foxglove.schemas import (
     SpherePrimitive,
     Pose,
@@ -25,6 +33,9 @@ from foxglove.schemas import (
     Point3,
     ArrowPrimitive,
     CubePrimitive,
+    RawImage,
+    Log,
+    CompressedVideo,
 )
 
 from vis_foxglove.utils import safe_copy, rm_r, to_numpy, gen_uuid, to_number
@@ -37,6 +48,28 @@ else:
     Ary = np.ndarray
 
 robot_models: Dict[str, PinRobotModel] = dict()
+
+
+def get_video_codec(file_path):
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        file_path,
+    ]
+    result = subprocess.run(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    if result.returncode == 0:
+        return result.stdout.strip()
+    else:
+        return f"Error: {result.stderr.strip()}"
 
 
 def convert_to_rel_path(path: str) -> str:
@@ -59,11 +92,14 @@ def to_scene_entity(scenes: List[Dict[str, list]]) -> SceneEntity:
         ],
         texts=[text for scene in scenes for text in scene.get("texts", [])],
         models=[model for scene in scenes for model in scene.get("models", [])],
-        frame_id="<root>",
     )
 
 
 class Vis:
+    def __init__(self):
+        self.ctx = Context()
+        self.server = foxglove.start_server(context=self.ctx)
+
     @staticmethod
     def to_pose(trans: Ary, rot: Optional[Ary] = None) -> Pose:
         if rot is None:
@@ -282,7 +318,9 @@ class Vis:
                     color=color,
                 )
             elif mesh_type == "mesh":
-                overwrite_mesh_path = mesh_param['path'].replace(os.path.dirname(urdf), name)
+                overwrite_mesh_path = mesh_param["path"].replace(
+                    os.path.dirname(urdf), name
+                )
                 lst += Vis.mesh(
                     path=mesh_param["path"],
                     trans=rot @ mesh_trans + trans,
@@ -293,20 +331,20 @@ class Vis:
                 )
         return lst
 
-    @staticmethod
     def show(
+        self,
         lst: List[List[Dict[str, list]]],
         path: Optional[str] = None,
-        dt: float = 0.1,
-        mesh_dir="tmp/vis",
+        topic: str = "/scene",
+        dt: float = 0.2,
+        mesh_dir: str = "tmp/vis",
+        non_blocking_t: Optional[int] = None,
     ):
-        ctx = Context()
-        scene_channel = SceneUpdateChannel("/scene", context=ctx)
+        scene_channel = SceneUpdateChannel(topic, context=self.ctx)
         if path is not None:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            writer = foxglove.open_mcap(path, context=ctx)
+            writer = foxglove.open_mcap(path, context=self.ctx)
 
-        rm_r(mesh_dir)
         os.makedirs(mesh_dir, exist_ok=True)
         copied_paths = set()
 
@@ -318,20 +356,82 @@ class Vis:
                             safe_copy(orig_path, os.path.join(mesh_dir, rel_path))
                             copied_paths.add(orig_path)
 
-        # request_sync()
+        print("start vis")
 
-        server = foxglove.start_server(context=ctx)
-        try:
-            first_run = True
+        def vis_loop(stdscr, dt=dt, lst=lst):
+            stdscr.clear()
+            stdscr.nodelay(1)
+            cur_t = 0
+            continuing = 1
+            int_num = 0
             while True:
-                for scene in lst:
-                    scene_channel.log(SceneUpdate(entities=[to_scene_entity(scene)]))
-                    sleep(dt)
-                if first_run and path is not None:
-                    writer.close()
-                first_run = False
-        except KeyboardInterrupt:
-            return
+                scene_channel.log(SceneUpdate(entities=[to_scene_entity(lst[cur_t])]))
+                key = stdscr.getch()
+                if key == ord("q"):
+                    break
+                elif key == ord(" "):
+                    continuing = 1 - continuing
+                elif key == ord("j"):
+                    continuing = False
+                    cur_t = min(cur_t + 1, len(lst) - 1)
+                elif key == ord("k"):
+                    continuing = False
+                    cur_t = max(cur_t - 1, 0)
+                elif key == ord("r"):
+                    continuing = False
+                    cur_t = 0
+                elif key == ord("b"):
+                    continuing = False
+                    cur_t = len(lst) - 1
+                elif key >= ord("0") and key <= ord("9"):
+                    int_num = int_num * 10 + (key - ord("0"))
+                elif key == ord("g"):
+                    continuing = False
+                    cur_t = int_num
+                    int_num = 0
+                elif key == ord("w"):
+                    dt /= 2
+                elif key == ord("s"):
+                    dt *= 2
+                sleep(dt)
+                cur_t = (cur_t + continuing) % len(lst)
+
+        # writer.close()
+        if non_blocking_t is not None:
+            scene_channel.log(
+                SceneUpdate(entities=[to_scene_entity(lst[non_blocking_t])])
+            )
+        else:
+            curses.wrapper(vis_loop)
+
+    def img(self, image: np.ndarray, topic: str = "/image"):
+        img_channel = RawImageChannel(topic, context=self.ctx)
+        img_channel.log(
+            RawImage(
+                data=image.tobytes(),
+                width=image.shape[1],
+                height=image.shape[0],
+                encoding="rgb8",
+                step=image.shape[1] * 3,
+            )
+        )
+
+    def video_file(self, video_path: str, topic: str = "/video"):
+        video_channel = CompressedVideoChannel(topic, context=self.ctx)
+        format = get_video_codec(video_path)
+        if format == "h264":
+            tmp_path = os.path.join("tmp", "convert_video", gen_uuid() + ".h264")
+            os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
+            os.system(
+                f"ffmpeg -i {video_path} -c:v copy -bsf:v h264_mp4toannexb -f h264 {tmp_path}"
+            )
+            video_path = tmp_path
+        with open(video_path, "rb") as f:
+            video_channel.log(CompressedVideo(data=f.read(), format=format))
+
+    def text(self, text: str, topic: str = "/text"):
+        log_channel = LogChannel(topic, context=self.ctx)
+        log_channel.log(Log(message=text))
 
 
 if __name__ == "__main__":
