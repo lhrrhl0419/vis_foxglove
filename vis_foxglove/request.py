@@ -4,14 +4,17 @@ import socketserver
 
 from vis_foxglove.download import download_with_rsync
 
-def request_sync(local_machine_ip="127.0.0.1", port=int(os.getenv("REQUEST_TRANSFER_PORT"))) -> bool:
+
+def request_sync(
+    local_machine_ip="127.0.0.1", port=int(os.getenv("REQUEST_TRANSFER_PORT"))
+) -> bool:
     """Send a sync request to the local machine"""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((local_machine_ip, port))
             s.sendall(b"SYNC_REQUEST")
-            response = s.recv(1024).decode('utf-8')
-            
+            response = s.recv(1024).decode("utf-8")
+
             if response == "SYNC_COMPLETE":
                 print("Sync completed successfully")
                 return True
@@ -24,7 +27,7 @@ def request_sync(local_machine_ip="127.0.0.1", port=int(os.getenv("REQUEST_TRANS
 
 class SyncRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        data = self.request.recv(1024).decode('utf-8').strip()
+        data = self.request.recv(1024).decode("utf-8").strip()
         if data == "SYNC_REQUEST":
             print("Received sync request from server")
             try:
