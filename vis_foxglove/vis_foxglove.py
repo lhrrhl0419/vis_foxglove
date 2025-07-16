@@ -39,7 +39,6 @@ from foxglove.schemas import (
 )
 
 from vis_foxglove.utils import safe_copy, rm_r, to_numpy, gen_uuid, to_number
-from vis_foxglove.request import request_sync
 from vis_foxglove.pin_model import PinRobotModel
 
 if torch is not None:
@@ -98,7 +97,7 @@ def to_scene_entity(scenes: List[Dict[str, list]]) -> SceneEntity:
 class Vis:
     def __init__(self):
         self.ctx = Context()
-        self.server = foxglove.start_server(context=self.ctx)
+        self.server = foxglove.start_server(context=self.ctx, port=int(os.environ.get("FOXGLOVE_PORT", 8765)))
 
     @staticmethod
     def to_pose(trans: Ary, rot: Optional[Ary] = None) -> Pose:
