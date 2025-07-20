@@ -434,6 +434,7 @@ class Vis:
 
 
 if __name__ == "__main__":
+    vis = Vis()
     # Vis.show([Vis.sphere(np.array([0, 0, 0]))])
     # vis.show([vis.sphere(np.array([0, 0, 0])), vis.sphere(np.array([0.1, 0, 0]), color=np.array([1, 0, 0, 1]))+vis.sphere(np.array([0.2, 0, 0]), color=np.array([0, 1, 0, 1]))])
     qpos = np.array(
@@ -477,4 +478,4 @@ if __name__ == "__main__":
     for i in range(10):
         qpos[0] = i * 0.1
         lst.append(Vis.robot(urdf_path, qpos, mesh_type="collision", name=f"galbot"))
-    Vis.show(lst)
+    vis.show(lst)
