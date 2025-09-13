@@ -93,11 +93,19 @@ def to_scene_entity(scenes: List[Dict[str, list]]) -> SceneEntity:
         models=[model for scene in scenes for model in scene.get("models", [])],
     )
 
+global_vis: "Vis" = None
 
 class Vis:
     def __init__(self):
         self.ctx = Context()
         self.server = foxglove.start_server(context=self.ctx, port=int(os.environ.get("FOXGLOVE_PORT", 8765)))
+    
+    @staticmethod
+    def get() -> "Vis":
+        global global_vis
+        if global_vis is None:
+            global_vis = Vis()
+        return global_vis
 
     @staticmethod
     def to_pose(trans: Ary, rot: Optional[Ary] = None) -> Pose:
@@ -167,6 +175,28 @@ class Vis:
             )
         ]
 
+    @staticmethod
+    def pose(
+        trans: Union[np.ndarray, torch.tensor],  # (3, )
+        rot: Union[np.ndarray, torch.tensor],  # (3, 3)
+        width: int = 0.1,
+        length: float = 0.01,
+        name: str = None,
+    ) -> List[Dict[str, list]]:
+        ret = []
+        for i in range(3):
+            color = "red" if i == 0 else "green" if i == 1 else "blue"
+            ret.append(
+                Vis.arrow(
+                    trans=trans,
+                    direction=rot[:, i],
+                    shaft_length=length,
+                    shaft_diameter=width,
+                    color=color,
+                )
+            )
+        return ret
+        
     @staticmethod
     def line(
         p1: Ary, p2: Ary, thickness: float = None, color: Union[str, Ary] = None
