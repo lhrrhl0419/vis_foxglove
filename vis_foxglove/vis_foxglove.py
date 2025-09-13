@@ -179,16 +179,16 @@ class Vis:
     def pose(
         trans: Union[np.ndarray, torch.tensor],  # (3, )
         rot: Union[np.ndarray, torch.tensor],  # (3, 3)
-        width: int = 0.1,
-        length: float = 0.01,
+        width: int = 0.01,
+        length: float = 0.1,
         name: str = None,
     ) -> List[Dict[str, list]]:
         ret = []
         for i in range(3):
             color = "red" if i == 0 else "green" if i == 1 else "blue"
-            ret.append(
+            ret.extend(
                 Vis.arrow(
-                    trans=trans,
+                    p1=trans,
                     direction=rot[:, i],
                     shaft_length=length,
                     shaft_diameter=width,
@@ -240,7 +240,7 @@ class Vis:
         rot = np.zeros((3, 3))
         direction = direction / np.linalg.norm(direction)
         rot[:, 0] = direction
-        rot[np.abs(direction[:, 0]).argmin(), 1] = 1.0
+        rot[np.abs(direction).argmin(), 1] = 1.0
         rot[:, 1] -= np.dot(rot[:, 1], rot[:, 0]) * rot[:, 0]
         rot[:, 1] /= np.linalg.norm(rot[:, 1])
         rot[:, 2] = np.cross(rot[:, 0], rot[:, 1])
