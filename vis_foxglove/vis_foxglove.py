@@ -2,6 +2,7 @@ import os
 from typing import Optional, List, Dict, Union
 import numpy as np
 import curses
+import matplotlib.pyplot as plt
 
 try:
     import torch
@@ -16,6 +17,7 @@ import foxglove
 from foxglove import Context
 from foxglove.channels import (
     SceneUpdateChannel,
+    PointCloudChannel,
     RawImageChannel,
     LogChannel,
     CompressedVideoChannel,
@@ -36,6 +38,9 @@ from foxglove.schemas import (
     RawImage,
     Log,
     CompressedVideo,
+    PointCloud,
+    PackedElementField,
+    PackedElementFieldNumericType
 )
 
 from vis_foxglove.utils import safe_copy, rm_r, to_numpy, gen_uuid, to_number
@@ -77,8 +82,8 @@ def convert_to_rel_path(path: str) -> str:
     return f"absolute_path{path}"
 
 
-def to_scene_entity(scenes: List[Dict[str, list]]) -> SceneEntity:
-    return SceneEntity(
+def to_scene_entity_pc(scenes: List[Dict[str, list]]) -> SceneEntity:
+    entity = SceneEntity(
         arrows=[arrow for scene in scenes for arrow in scene.get("arrows", [])],
         cubes=[cube for scene in scenes for cube in scene.get("cubes", [])],
         spheres=[sphere for scene in scenes for sphere in scene.get("spheres", [])],
@@ -92,6 +97,48 @@ def to_scene_entity(scenes: List[Dict[str, list]]) -> SceneEntity:
         texts=[text for scene in scenes for text in scene.get("texts", [])],
         models=[model for scene in scenes for model in scene.get("models", [])],
     )
+    pc_fields = [
+        PackedElementField(name="x", offset=0, type=PackedElementFieldNumericType.Float32),
+        PackedElementField(name="y", offset=4, type=PackedElementFieldNumericType.Float32),
+        PackedElementField(name="z", offset=8, type=PackedElementFieldNumericType.Float32),
+        PackedElementField(name="red", offset=12, type=PackedElementFieldNumericType.Uint8),
+        PackedElementField(name="green", offset=13, type=PackedElementFieldNumericType.Uint8),
+        PackedElementField(name="blue", offset=14, type=PackedElementFieldNumericType.Uint8),
+        PackedElementField(name="alpha", offset=15, type=PackedElementFieldNumericType.Uint8),
+    ]
+    pc = []
+    for scene in scenes:
+        for pointcloud in scene.get("pointclouds", []):
+            pc.append(pointcloud)
+    if len(pc) == 0:
+        return entity, None
+    pc = np.concatenate(pc, axis=0)
+    # Split xyz and rgba
+    xyz = pc[:, :3].astype(np.float32)
+    rgba = (pc[:, 3:7] * 255).astype(np.uint8)
+
+    # Structured buffer: 16 bytes per point
+    combined = np.zeros(len(pc), dtype=np.dtype([
+        ("x", "f4"), ("y", "f4"), ("z", "f4"),
+        ("r", "u1"), ("g", "u1"), ("b", "u1"), ("a", "u1"),
+    ]))
+
+    combined["x"] = xyz[:, 0]
+    combined["y"] = xyz[:, 1]
+    combined["z"] = xyz[:, 2]
+    combined["r"] = rgba[:, 0]
+    combined["g"] = rgba[:, 1]
+    combined["b"] = rgba[:, 2]
+    combined["a"] = rgba[:, 3]
+
+    pc = PointCloud(
+        point_stride=16,
+        fields=pc_fields,
+        data=combined.tobytes(),
+    )
+    return entity, pc
+
+
 
 global_vis: "Vis" = None
 
@@ -118,13 +165,15 @@ class Vis:
         )
 
     @staticmethod
-    def to_color(color: Union[str, Ary] = None, opacity: float = 1.0) -> Color:
+    def to_color(color: Union[str, Ary] = None, opacity: float = 1.0, return_list: bool = False) -> Union[Color, List[float]]:
         if isinstance(color, str):
             color = mcolors.to_rgb(color)
         if color is None:
             color = np.array([1, 0, 0])
         if len(color) == 3:
             color = np.append(color, opacity)
+        if return_list:
+            return color
         return Color(r=color[0], g=color[1], b=color[2], a=color[3])
 
     @staticmethod
@@ -147,6 +196,39 @@ class Vis:
                         color=Vis.to_color(color, opacity),
                     )
                 ]
+            )
+        ]
+    
+    @staticmethod
+    def pc(
+        points: Ary,
+        color: Union[str, Ary] = None,
+        value: Optional[Ary] = None,
+        colormap: str = "viridis",
+        normalize: bool = True,
+        opacity: float = None,
+    ) -> List[Dict[str, list]]:
+        points = to_numpy(points)
+        opacity = 1.0 if opacity is None else opacity
+        if value is None:
+            color = "blue" if color is None else color
+            if len(color.shape) == 1:
+                color = np.array(Vis.to_color(color, opacity, return_list=True))
+                colors = color[None].repeat(len(points), axis=0)
+            else:
+                colors = color
+                if colors.shape[1] == 3:
+                    opacity = np.ones(len(points)) * opacity
+                    colors = np.concatenate([colors, opacity], axis=1)
+        else:
+            value = to_numpy(value)
+            if normalize:
+                value = (value - value.min()) / (value.max() - value.min())
+            colors = plt.cm.get_cmap(colormap)(value)
+            colors[:, 3] *= opacity
+        return [
+            dict(
+                pointclouds=[np.concatenate([points, colors], axis=1)]
             )
         ]
 
@@ -365,11 +447,13 @@ class Vis:
         lst: List[List[Dict[str, list]]],
         path: Optional[str] = None,
         topic: str = "/scene",
+        pc_topic: str = "/pointcloud",
         dt: float = 0.2,
         mesh_dir: str = "tmp/vis",
         non_blocking_t: Optional[int] = None,
     ):
         scene_channel = SceneUpdateChannel(topic, context=self.ctx)
+        pointcloud_channel = PointCloudChannel(pc_topic, context=self.ctx)
         if path is not None:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             writer = foxglove.open_mcap(path, context=self.ctx)
@@ -394,7 +478,10 @@ class Vis:
             continuing = 1
             int_num = 0
             while True:
-                scene_channel.log(SceneUpdate(entities=[to_scene_entity(lst[cur_t])]))
+                entities, pc = to_scene_entity_pc(lst[cur_t])
+                scene_channel.log(SceneUpdate(entities=[entities]))
+                if pc is not None:
+                    pointcloud_channel.log(pc)
                 key = stdscr.getch()
                 if key == ord("q"):
                     break
