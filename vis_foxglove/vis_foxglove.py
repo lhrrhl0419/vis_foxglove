@@ -192,7 +192,7 @@ class Vis:
                 spheres=[
                     SpherePrimitive(
                         pose=Vis.to_pose(trans),
-                        size=Vector3(x=radius, y=radius, z=radius),
+                        size=Vector3(x=radius * 2, y=radius * 2, z=radius * 2),
                         color=Vis.to_color(color, opacity),
                     )
                 ]
@@ -212,7 +212,7 @@ class Vis:
         opacity = 1.0 if opacity is None else opacity
         if value is None:
             color = "blue" if color is None else color
-            if len(color.shape) == 1:
+            if isinstance(color, str) or len(color.shape) == 1:
                 color = np.array(Vis.to_color(color, opacity, return_list=True))
                 colors = color[None].repeat(len(points), axis=0)
             else:
@@ -466,7 +466,7 @@ class Vis:
                 if "mesh_list" in o:
                     for orig_path, rel_path in o["mesh_list"]:
                         if orig_path not in copied_paths:
-                            safe_copy(orig_path, os.path.join(mesh_dir, rel_path))
+                            safe_copy(orig_path, os.path.join(mesh_dir, rel_path), allow_overwrite=True)
                             copied_paths.add(orig_path)
 
         print("start vis")
@@ -589,10 +589,10 @@ if __name__ == "__main__":
             0.0,
             0.0,
         ]
-    )
-    urdf_path = "tmp/temp_urdf/fb9ab88e-e0c0-4323-8412-5a161a0e3fd9/robot.urdf"
+    ) * 0
+    urdf_path = "tmp/temp_urdf/0a9f408c-ebba-4588-8276-6face8d28b1c/robot.urdf"
     lst = []
     for i in range(10):
-        qpos[0] = i * 0.1
+        qpos[0] = i * 0.
         lst.append(Vis.robot(urdf_path, qpos, mesh_type="collision", name=f"galbot"))
     vis.show(lst)
