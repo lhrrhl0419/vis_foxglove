@@ -165,13 +165,14 @@ class Vis:
         )
 
     @staticmethod
-    def to_color(color: Union[str, Ary] = None, opacity: float = 1.0, return_list: bool = False) -> Union[Color, List[float]]:
+    def to_color(color: Union[str, Ary] = None, opacity: float = 1.0, brightness: float = 1.0, return_list: bool = False) -> Union[Color, List[float]]:
         if isinstance(color, str):
             color = mcolors.to_rgb(color)
         if color is None:
             color = np.array([1, 0, 0])
         if len(color) == 3:
             color = np.append(color, opacity)
+        color *= brightness
         if return_list:
             return color
         return Color(r=color[0], g=color[1], b=color[2], a=color[3])
@@ -269,6 +270,7 @@ class Vis:
         length: float = 0.1,
         name: str = None,
         color: Union[str, Ary] = None,
+        brightness: float = 1.0,
     ) -> List[Dict[str, list]]:
         ret = []
         for i in range(3):
@@ -283,6 +285,7 @@ class Vis:
                     shaft_length=length,
                     shaft_diameter=width,
                     color=this_color,
+                    brightness=brightness
                 )
             )
         return ret
@@ -319,6 +322,7 @@ class Vis:
         head_length: float = None,
         head_diameter: float = None,
         color: Union[str, Ary] = None,
+        brightness: float = 1.0,
     ) -> List[Dict[str, list]]:
         p1 = to_numpy(p1)
         direction = to_numpy(direction)
@@ -343,7 +347,7 @@ class Vis:
                         shaft_diameter=shaft_diameter,
                         head_length=head_length,
                         head_diameter=head_diameter,
-                        color=Vis.to_color(color),
+                        color=Vis.to_color(color, brightness=brightness),
                     )
                 ]
             )
@@ -459,6 +463,7 @@ class Vis:
         dt: float = 0.2,
         mesh_dir: str = "tmp/vis",
         non_blocking_t: Optional[int] = None,
+        sleep_time: float = 2.0,
     ):
         scene_channel = SceneUpdateChannel(topic, context=self.ctx)
         pointcloud_channel = PointCloudChannel(pc_topic, context=self.ctx)
@@ -477,6 +482,7 @@ class Vis:
                             safe_copy(orig_path, os.path.join(mesh_dir, rel_path), allow_overwrite=True)
                             copied_paths.add(orig_path)
 
+        sleep(sleep_time)
         print("start vis")
 
         def vis_loop(stdscr, dt=dt, lst=lst):
