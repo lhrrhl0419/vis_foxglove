@@ -177,6 +177,10 @@ class Vis:
         return Color(r=color[0], g=color[1], b=color[2], a=color[3])
 
     @staticmethod
+    def rand_color() -> Ary:
+        return np.random.rand(3)
+
+    @staticmethod
     def sphere(
         trans: Ary = None,
         radius: float = None,
@@ -264,17 +268,21 @@ class Vis:
         width: int = 0.01,
         length: float = 0.1,
         name: str = None,
+        color: Union[str, Ary] = None,
     ) -> List[Dict[str, list]]:
         ret = []
         for i in range(3):
-            color = "red" if i == 0 else "green" if i == 1 else "blue"
+            if color is None:
+                this_color = "red" if i == 0 else "green" if i == 1 else "blue"
+            else:
+                this_color = color
             ret.extend(
                 Vis.arrow(
                     p1=trans,
                     direction=rot[:, i],
                     shaft_length=length,
                     shaft_diameter=width,
-                    color=color,
+                    color=this_color,
                 )
             )
         return ret
@@ -316,8 +324,8 @@ class Vis:
         direction = to_numpy(direction)
         shaft_length = 0.1 if shaft_length is None else to_number(shaft_length)
         shaft_diameter = 0.01 if shaft_diameter is None else to_number(shaft_diameter)
-        head_length = 0.02 if head_length is None else to_number(head_length)
-        head_diameter = 0.02 if head_diameter is None else to_number(head_diameter)
+        head_length = shaft_length / 5 if head_length is None else to_number(head_length)
+        head_diameter = shaft_diameter * 2 if head_diameter is None else to_number(head_diameter)
         color = "blue" if color is None else color
         rot = np.zeros((3, 3))
         direction = direction / np.linalg.norm(direction)
@@ -372,7 +380,7 @@ class Vis:
 
         if path.endswith(".obj"):
             media_type = "model/obj"
-        elif path.endswith(".stl"):
+        elif path.lower().endswith(".stl"):
             media_type = "model/stl"
 
         return [

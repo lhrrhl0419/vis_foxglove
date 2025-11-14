@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 setup(
     name="vis_foxglove",
@@ -6,7 +6,7 @@ setup(
     author="lhrrhl0419",
     description="visualization with foxglove",
     long_description=open("README.md").read(),
-    packages=find_packages(),
+    packages=find_namespace_packages(),
     python_requires=">=3.9",
     install_requires=[
         "numpy",
